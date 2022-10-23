@@ -58,13 +58,14 @@ def train(
 
     # move model to specified device
     model.to(device)
+    model.device = device
 
 
     for epoch in epoch_bar:
 
         for iteration, batch in enumerate(tqdm(train_dataloader, desc='Batch Progress Bar', position=1, leave=False)):
             # read each batch and perform a forward pass
-            train_loss = train_forward(model=model, batch=batch)
+            train_loss = train_forward(model=model, batch=batch.to(device))
 
             # backward pass
             train_loss.backward()
@@ -127,7 +128,6 @@ def evaluate(model, dataloader):
 
     Returns:
         - eval_loss: the mean total loss of the model on all the data in the dataloader
-    
     '''
 
     # dont generate gradients
@@ -137,7 +137,7 @@ def evaluate(model, dataloader):
     
         for batch in tqdm(dataloader, desc='Running Evaluation', leave=False):
             # loop through dataloader and calculate loss
-            eval_loss += train_forward(model, batch).item()
+            eval_loss += train_forward(model, batch.to(model.device)).item()
 
         # calculalate mean
         eval_loss /= len(dataloader)
