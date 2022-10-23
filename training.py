@@ -87,6 +87,7 @@ def train(
 
                 # if this is the lowest eval loss seen so far then save the model parameters
                 if eval_loss < best_eval_loss:
+                    best_eval_loss = eval_loss
                     torch.save(model.state_dict(), 'model.pt')
             
 
