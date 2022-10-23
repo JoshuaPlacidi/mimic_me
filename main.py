@@ -11,9 +11,9 @@ from training import train
 
 folder_path = '/Users/joshua/env/datasets/whatsapp_chat_logs'
 
-train_dataloader, test_dataloader = create_dataloaders('joshua', folder_path, batch_size=1)
+train_dataloader, test_dataloader = create_dataloaders('joshua', folder_path, batch_size=32)
 
-model = ChatModel()
+model = ChatModel(device='cpu')
 
 train(model=model, train_dataloader=train_dataloader, test_dataloader=test_dataloader)
 

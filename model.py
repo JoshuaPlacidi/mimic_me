@@ -3,20 +3,21 @@ import torch
 from transformers import BertGenerationEncoder, BertGenerationDecoder, EncoderDecoderModel, BertTokenizerFast
 
 class ChatModel(torch.nn.Module):
-	def __init__(self):
+	def __init__(self, device='cpu'):
 		'''
 		Description:
 			Model object, composed of pretrained transformer encoder and transformer decoder modules
 		'''
 		super(ChatModel, self).__init__()
+		self.device = device
 
 		# initialise tokenizer and download pretrained weights
 		self.tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
 
 		# initialise model and download pretrained weights
 		self.model = EncoderDecoderModel.from_encoder_decoder_pretrained("bert-base-uncased", "bert-base-uncased")
-		
-		
+		self.model.to(device)
+
 		self.model.config.decoder_start_token_id = self.tokenizer.cls_token_id
 		self.model.config.eos_token_id = self.tokenizer.sep_token_id
 		self.model.config.pad_token_id = self.tokenizer.pad_token_id
@@ -49,7 +50,7 @@ class ChatModel(torch.nn.Module):
 			return_tensors='pt',
 		)
 
-		return batch_encoding
+		return batch_encoding.to(self.device)
 
 	def forward(self, prompt_tkn, answer_tkn):
 		'''
