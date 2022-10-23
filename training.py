@@ -9,7 +9,6 @@ def train(
     num_epochs: int = 10,
     eval_steps: int = None,
     optimizer = torch.optim.AdamW,
-    criterion = torch.nn.CrossEntropyLoss(),
     initial_learning_rate: float = 1e-4,
     device='cpu',
     ):
@@ -31,7 +30,7 @@ def train(
     '''
 
     # tqdm object to create progress bar for epoch count
-    epoch_bar = tqdm(range(num_epochs))
+    epoch_bar = tqdm(range(num_epochs), desc='Epoch Progress Bar', position=0)
 
     # initialise the optimizer with the model parameters we would like to be adjusted during training
     optimizer = optimizer(
@@ -63,9 +62,9 @@ def train(
 
     for epoch in epoch_bar:
 
-        for iteration, batch in enumerate(train_dataloader):
+        for iteration, batch in enumerate(tqdm(train_dataloader, desc='Batch Progress Bar', position=1, leave=False)):
             # read each batch and perform a forward pass
-            train_loss = train_forward(model=model, batch=batch, criterion=criterion)
+            train_loss = train_forward(model=model, batch=batch)
 
             # backward pass
             train_loss.backward()
@@ -78,7 +77,7 @@ def train(
 
             if iteration % eval_steps == 0 and iteration > 0:
                 # if eval_steps has been reached then perform an evaluation
-                eval_loss = evaluate(model, test_dataloader, criterion)
+                eval_loss = evaluate(model, test_dataloader)
 
                 # update the progress bar
                 epoch_bar.set_description(
@@ -90,9 +89,9 @@ def train(
                     )
                 )
 
-            # if this is the lowest eval loss seen so far then save the model parameters
-            if eval_loss < best_eval_loss:
-                torch.save(model.state_dict(), 'model.pt')
+                # if this is the lowest eval loss seen so far then save the model parameters
+                if eval_loss < best_eval_loss:
+                    torch.save(model.state_dict(), 'model.pt')
             
 
 
@@ -114,7 +113,7 @@ def train_forward(model, batch):
     answer_tkn = model.encode(answer_str)['input_ids']
 
     # pass through model
-    loss = model(input_ids=prompt_tkn, labels=answer_tkn)['loss']
+    loss = model(prompt_tkn=prompt_tkn, answer_tkn=answer_tkn)['loss']
 
     return loss
 
@@ -136,7 +135,7 @@ def evaluate(model, dataloader):
 
         eval_loss = 0
     
-        for batch in dataloader:
+        for batch in tqdm(dataloader, desc='Running Evaluation', leave=False):
             # loop through dataloader and calculate loss
             eval_loss += train_forward(model, batch).item()
 

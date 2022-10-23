@@ -42,7 +42,7 @@ class ChatModel(torch.nn.Module):
 			- batch_encoding: PyTorch tensor of token sequence for each text element input
 		'''
 		batch_encoding = self.tokenizer(
-			text=text,
+			text=list(text),
 			padding='max_length',
 			max_length=100,
 			truncation=True,
@@ -50,7 +50,6 @@ class ChatModel(torch.nn.Module):
 		)
 
 		return batch_encoding
-
 
 	def forward(self, prompt_tkn, answer_tkn):
 		'''
@@ -61,8 +60,7 @@ class ChatModel(torch.nn.Module):
 			- prompt_tkn: batch of token sequences
 			- answer_tkn: batch of corresponding answer sequences
 		'''
-		x = self.model(input_ids=prompt_tkn, decoder_input_ids=answer_tkn)
-
+		x = self.model(input_ids=prompt_tkn, labels=answer_tkn)
 		return x
 
 	def inference(self, promt_str):

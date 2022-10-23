@@ -15,6 +15,7 @@ class ChatDataset(Dataset):
 		self.datapoints = datapoints
 
 	def __len__(self):
+		return 5
 		# return number of datapoints
 		return len(self.datapoints)
 
