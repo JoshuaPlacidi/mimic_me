@@ -15,7 +15,6 @@ class ChatDataset(Dataset):
 		self.datapoints = datapoints
 
 	def __len__(self):
-		return 5
 		# return number of datapoints
 		return len(self.datapoints)
 
@@ -34,10 +33,10 @@ class ChatDataset(Dataset):
 		datapoint = self.datapoints[index]
 
 		# read prompt and answer message
-		prompt = datapoint['prompt']['message']
-		answer = datapoint['answer']['message']
+		context = datapoint['context']
+		response = datapoint['response']
 
-		return prompt, answer
+		return context, response
 		
 def create_dataloaders(username: str, data_folder: str, batch_size: int = 32, split_ratio: float = 0.8):
 	'''

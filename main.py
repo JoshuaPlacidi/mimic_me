@@ -1,5 +1,5 @@
 import sys
-
+import torch
 from dataset import create_dataloaders
 from model import ChatModel
 from training import train
@@ -15,9 +15,20 @@ train_dataloader, test_dataloader = create_dataloaders('joshua', folder_path, ba
 
 model = ChatModel(device='cpu')
 
-train(model=model, train_dataloader=train_dataloader, test_dataloader=test_dataloader)
+# model.load_state_dict(torch.load('model.pt'))
+ 
+train(model=model, train_dataloader=train_dataloader, test_dataloader=test_dataloader, num_epochs=1)
 
-prompt = 'Do you like dogs?'
+prompt = 'Should I buy a car?'
 answer = model.inference(prompt)
 
 print(answer)
+
+prompt = 'Is the sky blue or green?'
+answer = model.inference(prompt)
+print(answer)
+
+#prompt = 'Should I buy the new CPU from AMD?'
+#answer = model.inference(prompt)
+
+#print(answer)

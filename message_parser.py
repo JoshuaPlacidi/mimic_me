@@ -5,36 +5,40 @@ from datetime import datetime
 class WhatsAppParser():
     def __init__(self,
         username: str,
-        prompt_time_allowance: int = 300,
+        group_message_allowance: int = 1200,
         answer_time_allowance: int = 10000,
+        max_context_message_length: int = 200,
         debug: bool = False,
         ):
         '''
         Description:
-            Class for parsing WhatsApps chat files
+            Parsers WhatsApp chat files and converts them into data points
 
         Params:
-            - username: the username of the person to contruct the answers to the prompts around
-            - prompt_time_allowance: max number of seconds allowed between messages in order for them to be chained together in a prompt
-            - answer_time_allowance: max number of seconds allowed between the final message of a prompt and a candidate answer in order for them to be paired
-            - debug: if True then debugging messages (such as caught exceptions) will be printed to the terminal
+            - username (str): the username of the person to contruct the answers to the prompts around
+            - group_message_allowance (int): max number of seconds allowed between messages in order for them to be treated as a single message
+            - answer_time_allowance (int): max number of seconds allowed between the prevouis message and a candidate answer in order for them to be paired
+            - max_context_message_length (int): the maximum number of characters allowed in a context string
+            - debug (bool): if True then debugging messages (such as caught exceptions) will be printed to the terminal
         '''
 
         self.username = username
-        self.prompt_time_allowance = prompt_time_allowance
+        self.group_message_allowance = group_message_allowance
         self.answer_time_allowance = answer_time_allowance
+        self.max_context_message_length = max_context_message_length
         self.debug = debug
 
         # hard coded list of auto generated WhatsApp messages that should be ignored
         self.messages_to_ignore = [
             "image omitted",
-            "Missed voice call",
-            "This message was deleted.",
-            "You deleted this message",
+            "missed voice call",
+            "this message was deleted",
+            "you deleted this message",
             "audio omitted",
-            "GIF omitted",
-            "Missed video call",
-            "Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them.",
+            "gif omitted",
+            "missed video call",
+            "\u200e",
+
         ]
 
     def parse_folder(self, folder_path: str):
@@ -90,10 +94,10 @@ class WhatsAppParser():
             Parses a WhatsApp txt file
 
         Params:
-            - file_path: file_path of the file to parse
+            - file_path (str): file_path of the file to parse
 
         Returns:
-            - datapoints: a list of dictionaries, each dictionary contains information about a prompt answer pair
+            - datapoints (list[Dict]): a list of dictionaries, each dictionary contains a context and response data pair
         '''
 
         with open(file_path) as f:
@@ -102,130 +106,148 @@ class WhatsAppParser():
         # process the raw chat log lines
         processed_lines = self.process_raw_lines(raw_lines)
 
+        # combine messages sent in quick succession from the same person into one message
+        grouped_messages = self.group_messages(processed_lines)
+
         # convert them into prompt answer pairs
-        datapoints = self.generate_datapoints(processed_lines)
+        datapoints = self.generate_datapoints(grouped_messages)
 
         return datapoints
 
 
-    def generate_datapoints(self, processed_lines: list):
+    def generate_datapoints(self, grouped_messages: list[dict]):
         '''
         Description:
-            Convert a list of processed lines into a list of datapoints (prompt answer pairs)
+            Convert a list of processed lines into a list of datapoints (context and response pairs)
 
         Params:
-            - processed_lines: list of processed text lines
+            - processed_lines (list[dict]): list of grouped messages
 
         Returns:
-            - datapoints: a list of dictionaries, each dictionary contains information about a prompt answer pair
+            - datapoints (list[dict]): a list of dictionaries, each dictionary contains information about a prompt answer pair
         '''
-
-        # start at line 0 of the text file
-        index = 0
 
         # initialise datapoints list
         datapoints = []
         
-        # loop through the series of lines, we exit the while loop when index <= num lines - 2 because we require
-        # at least two messages to generate a text answer pair, with this exit clause we attempt to make a prompt
-        # out of all but the last message sent in the file
-        while index <= len(processed_lines) - 2:
+        # start with the most recent message sent
+        # and loop backwards to the very first
+        i = len(grouped_messages) - 1
+        while i > 0:
             
-            # attempt to chain together a series of messages into a prompt
-            prompt, prompt_end_index = self.chain_message(index, processed_lines)
+            # read the current message as a potential response datapoint
+            response_candidate = grouped_messages[i]
 
-            # attempt to find an answer to the prompt
-            answer = self.generate_answer(prompt, processed_lines)
+            # check the author of the response message is the target username we are looking for
+            if response_candidate['name'] == self.username:
 
-            # if answer is found and the name matches the specified username then add it to datapoints
-            if answer and answer['name'] == self.username:
-                datapoints.append({
-                    'prompt':prompt,
-                    'answer':answer
-                })
+                # initialise the context string
+                context_string = ''
 
-            # set the next prompt index to attmpt to start just after the current processed prompt
-            index = prompt_end_index
+                # use this bool to flip between messages being sent by other users and the target username
+                different_user = True
+
+                # initialise j
+                j = i - 1
+
+    
+                while j >= 0:
+
+                    # read context candidate
+                    context_candidate = grouped_messages[j]
+
+                    # this if statement is to ensure that each message we add to our data point alternates between being written by the target username,
+                    # and then by someone else, and then by the target username, etc...
+                    # Also checks the message was sent within the time limit
+                    if ((different_user and context_candidate['name'] != self.username) or (not different_user and context_candidate['name'] == (self.username)) and (context_candidate['time'] - response_candidate['time']) < self.answer_time_allowance) and len(context_string) < self.max_context_message_length:
+
+                        # prepend the message to the front of the context string (with splitting tokens)
+                        context_string = '<s> ' + context_candidate['message'] + ' </s> ' + context_string
+
+                        # flip the different user bool
+                        different_user = not different_user
+
+                    else:
+
+                        # if the message at the front of the context string was sent by the target user
+                        # then append a dummy message to be the first message
+                        if context_candidate['name'] == self.username:
+                            context_string = '<s> Hello </s> ' + context_string
+
+                        # create data point and add it to the list
+                        data = {
+                            'context': context_string,
+                            'response': response_candidate['message']
+                        }
+                        datapoints.append(data)
+                        
+                        break
+
+                    # if this is the last message in the whatsapp file then move to the next iteration which will add it to the datapoints list
+                    # otherwise decrease j
+                    if j == 0:
+                        continue
+                    else:
+                        j -= 1
+
+            i -= 1
 
         return datapoints
 
-    def generate_answer(self, prompt, processed_lines):
+
+    def group_messages(self, processed_lines):
         '''
         Description:
-            Given a prompt, attempts to generate a matching answer
+            Group 'rapid' messages into a singular message, rapid messages are ones sent in quick succession by the same person (with no other messaegs in between)
 
         Params:
-            - prompt: dictionary object containing prompt information
-            - processed_lines: list of processed lines
+            - processed_lines (list[dict]): list of processed messages
 
         Returns:
-            - answer: dictionary containing information from the generated answer
-            OR
-            - None: if no answer could be found then return None
+            - grouped_message (list[dict]): list of grouped messages
+        
         '''
 
-        # start searching for an answer from the end of the prompt index + 1
-        answer_start_index = prompt['end_index'] + 1
-        candidate_answer = processed_lines[answer_start_index]
+        grouped_messages = []
 
-        # if the message was written by someone else and the message time was within the allowed limit 
-        if (candidate_answer['name'] != prompt['name']) and (prompt['end_time'] - candidate_answer['time'] < self.answer_time_allowance):
-            answer, _ = self.chain_message(answer_start_index, processed_lines)
-            return answer
-        else:
-            return None
+        # start with the first message and loop to the end of the lines
+        i = 0
+        while i < len(processed_lines):
 
-    def chain_message(self, prompt_index, processed_lines):
+            # read  information about starting messages
+            start_name = processed_lines[i]['name']
+            start_time = processed_lines[i]['time']
+            message = processed_lines[i]['message']
 
-        # read the start of the prompt
-        prompt_start = processed_lines[prompt_index]
+            # loop forward for looking for new messages to group together
+            j = i + 1
+            while j < len(processed_lines):
 
-        prompt = {
-            'name': prompt_start['name'],
-            'start_index': prompt_index,
-            'start_time': prompt_start['time']
-        }
+                # read a group candidate message
+                candidate = processed_lines[j]
 
-        # initialise the prompt message
-        prompt_message = '{0}.'.format(prompt_start['message'])
+                # if group conditions are reached then group together the message strings, otherwise exit the loop
+                if candidate['name'] == start_name and (candidate['time'] - start_time) < self.group_message_allowance:
+                    message += '. {0}'.format(candidate['message'])
+                else:
+                    break
 
-        if not prompt_message.endswith('.'):
-            prompt_message = prompt_message + '.'
+                j += 1
 
-        # initialise prompt current
-        prompt_current = prompt_start
+            # create new message dictionary and add to list
+            new_message = {
+                'name': start_name,
+                'time': start_time,
+                'message': message,
+            }
+            grouped_messages.append(new_message)
 
-        # keep looping until the end of the processed lines if nessassary
-        while prompt_index < len(processed_lines) - 1:
-            # increment index
-            prompt_index += 1
+            # increment i to j's position, so that already grouped messages are skipped
+            i = j
 
-            # read the next message
-            candidate_prompt_addition = processed_lines[prompt_index]
+        return grouped_messages
 
-            # test if the new message fits the requirements for being added to the current prompt
-            if (candidate_prompt_addition['name'] == prompt_current['name']) and ((candidate_prompt_addition['time'] - prompt_current['time']) < self.prompt_time_allowance):
 
-                # if requirements are met then append the candidates message on to the prompts message
-                prompt_message = prompt_message + ' ' + candidate_prompt_addition['message']
-
-                # add a full stop if nessassary
-                if not prompt_message.endswith('.'):
-                    prompt_message = prompt_message + '.'
-
-                # update prompt current, used to maintain time checks in the next cycle of the while loop
-                prompt_current = processed_lines[prompt_index]
-
-            else:
-                break
-
-        # set the end index to be the prompt index - 1 becuase the final index from the while loop would have failed to chain
-        prompt['end_index'] =  prompt_index - 1
-        prompt['end_time'] = prompt_current['time']
-        prompt['message'] = prompt_message
-
-        # if conditions are not met then stop the prompt 'chain' and return the prompt message and the end index of the prompt
-        return prompt, prompt_index
 
     def process_raw_lines(self, raw_lines: list, print_exceptions: bool = False):
         '''
@@ -246,6 +268,7 @@ class WhatsAppParser():
 
         # loop over each line and attempt to extract the time, name, and message
         for line in raw_lines:
+
             line = line.strip()
             # attempt to read the time from the raw line
             try:
@@ -287,7 +310,7 @@ class WhatsAppParser():
                 # this assertion removes WhatsApp generated messages like "image omitted" or "missed call"
                 # these are not real messages but notifications added to the chat by whatsapp
                 # these messages are proceded by a special character, which we ignore in this assertion check by indexing with [1:]
-                assert not any(substring in message for substring in self.messages_to_ignore), 'message "{0}" is in ignore message list'
+                assert not any(substring in message.lower() for substring in self.messages_to_ignore), 'message "{0}" is in ignore message list'
 
             except Exception as message_exception:
                 if print_exceptions:
@@ -302,3 +325,19 @@ class WhatsAppParser():
                 })
 
         return processed_lines
+
+
+if __name__ == '__main__':
+
+    parser = WhatsAppParser(username='joshua', debug=False)
+    datapoints = parser.parse_folder('/Users/joshua/env/datasets/whatsapp_chat_logs')
+
+
+    while True:
+
+        from random import randrange
+        r = randrange(len(datapoints))
+        print(datapoints[r])
+        import time
+        time.sleep(10)
+        print('\n')

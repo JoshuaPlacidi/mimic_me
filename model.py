@@ -1,58 +1,47 @@
 from os import truncate
 import torch
-from transformers import BertGenerationEncoder, BertGenerationDecoder, EncoderDecoderModel, BertTokenizerFast
+from transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
 
 class ChatModel(torch.nn.Module):
-	def __init__(self, device='cpu'):
+	def __init__(self):
 		'''
 		Description:
 			Model object, composed of pretrained transformer encoder and transformer decoder modules
 		'''
 		super(ChatModel, self).__init__()
-		self.device = device
 
-		# initialise tokenizer and download pretrained weights
-		self.tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
+		self.model_name = "facebook/blenderbot-400M-distill"
 
-		# initialise model and download pretrained weights
-		self.model = EncoderDecoderModel.from_encoder_decoder_pretrained("bert-base-uncased", "bert-base-uncased")
-		self.model.to(device)
+		self.tokenizer = BlenderbotTokenizer.from_pretrained(self.model_name, truncation_side='left')
 
-		self.model.config.decoder_start_token_id = self.tokenizer.cls_token_id
-		self.model.config.eos_token_id = self.tokenizer.sep_token_id
-		self.model.config.pad_token_id = self.tokenizer.pad_token_id
-		self.model.config.vocab_size = self.model.config.encoder.vocab_size
+		self.model = BlenderbotForConditionalGeneration.from_pretrained(self.model_name)
 
-		self.model.config.max_length = 142
-		self.model.config.min_length = 56
-		self.model.config.no_repeat_ngram_size = 3
-		self.model.config.early_stopping = True
-		self.model.config.length_penalty = 2.0
-		self.model.config.num_beams = 4
-
-
-	def encode(self, text: list):
+	def encode(self, text: str):
 		'''
 		Description:
-			Batch convert a str() into a sequence of tokens representing the original text
+			Convert a str() into a sequence of tokens representing the original text
 
 		Params:
 			- text: list of strings containing sequences to be encoded
 
 		Returns:
-			- batch_encoding: PyTorch tensor of token sequence for each text element input
+			- tokens (torch.Tensor): token tensor for each text element input
+			- mask (torch.Tensor): tensor of 1s and 0s, 1 where attention should be calculated, 0 for tokens that should be ignored
 		'''
-		batch_encoding = self.tokenizer(
-			text=list(text),
+
+		output = self.tokenizer.batch_encode_plus(
+			batch_text_or_text_pairs = text,
+			return_tensors='pt',
 			padding='max_length',
 			max_length=100,
-			truncation=True,
-			return_tensors='pt',
-		)
+			truncation=True)
 
-		return batch_encoding.to(self.device)
+		tokens, mask = output['input_ids'], output['attention_mask']
 
-	def forward(self, prompt_tkn, answer_tkn):
+		return tokens, mask
+
+
+	def forward(self, prompt_tokens, prompt_mask, labels):
 		'''
 		Description:
 			Forward pass through the model
@@ -60,17 +49,31 @@ class ChatModel(torch.nn.Module):
 		Params:
 			- prompt_tkn: batch of token sequences
 			- answer_tkn: batch of corresponding answer sequences
+
+		Returns:
+			- x (transformers.modeling_outputs.Seq2SeqModelOutput): output of the forward pass
 		'''
-		x = self.model(input_ids=prompt_tkn, labels=answer_tkn)
+		x = self.model(input_ids=prompt_tokens, attention_mask=prompt_mask, labels=labels)
 		return x
 
-	def inference(self, promt_str):
+	def inference(self, context: str):
+		'''
+		Description:
+			Generate a string output for a given context string input
+
+		Params:
+			- context (str): the input text to condition on
+
+		Returns:
+			- response (str): natural language response to the context
+		
+		'''
 		with torch.no_grad():
 
-			prompt_tkn = self.encode(promt_str)['input_ids']
+			context_tokens, context_mask = self.encode([context])
 
-			answer_tkn = self.model.generate(prompt_tkn, bos_token_id = prompt_tkn.shape[-1])
+			response_tokens = self.model.generate(input_ids=context_tokens, attention_mask=context_mask)
 
-			answer_str = self.tokenizer.decode(answer_tkn[0])
+			response = self.tokenizer.batch_decode(response_tokens, skip_special_tokens=True)[0]
 
-			return answer_str
+			return response
