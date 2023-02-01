@@ -100,7 +100,7 @@ class WhatsAppParser():
             - datapoints (list[Dict]): a list of dictionaries, each dictionary contains a context and response data pair
         '''
 
-        with open(file_path) as f:
+        with open(file_path, encoding='utf-8') as f:
             raw_lines = f.readlines()
 
         # process the raw chat log lines
@@ -310,7 +310,7 @@ class WhatsAppParser():
                 # this assertion removes WhatsApp generated messages like "image omitted" or "missed call"
                 # these are not real messages but notifications added to the chat by whatsapp
                 # these messages are proceded by a special character, which we ignore in this assertion check by indexing with [1:]
-                assert not any(substring in message.lower() for substring in self.messages_to_ignore), 'message "{0}" is in ignore message list'
+                #assert not any(substring in message.lower() for substring in self.messages_to_ignore), 'message "{0}" is in ignore message list'
 
             except Exception as message_exception:
                 if print_exceptions:
@@ -329,8 +329,8 @@ class WhatsAppParser():
 
 if __name__ == '__main__':
 
-    parser = WhatsAppParser(username='joshua', debug=False)
-    datapoints = parser.parse_folder('/Users/joshua/env/datasets/whatsapp_chat_logs')
+    parser = WhatsAppParser(username='joshua', debug=True)
+    datapoints = parser.parse_folder('F:/Dev/datasets/whatsapp')
 
 
     while True:

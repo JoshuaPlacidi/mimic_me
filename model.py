@@ -3,7 +3,7 @@ import torch
 from transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
 
 class ChatModel(torch.nn.Module):
-	def __init__(self):
+	def __init__(self, device='cpu'):
 		'''
 		Description:
 			Model object, composed of pretrained transformer encoder and transformer decoder modules
@@ -15,6 +15,9 @@ class ChatModel(torch.nn.Module):
 		self.tokenizer = BlenderbotTokenizer.from_pretrained(self.model_name, truncation_side='left')
 
 		self.model = BlenderbotForConditionalGeneration.from_pretrained(self.model_name)
+
+		self.device = device
+		self.model.to(device)
 
 	def encode(self, text: str):
 		'''
@@ -72,7 +75,7 @@ class ChatModel(torch.nn.Module):
 
 			context_tokens, context_mask = self.encode([context])
 
-			response_tokens = self.model.generate(input_ids=context_tokens, attention_mask=context_mask)
+			response_tokens = self.model.generate(input_ids=context_tokens.to(self.device), attention_mask=context_mask.to(self.device))
 
 			response = self.tokenizer.batch_decode(response_tokens, skip_special_tokens=True)[0]
 

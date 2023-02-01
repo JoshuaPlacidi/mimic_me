@@ -9,22 +9,21 @@ from training import train
 # 	raise Exception('Incorrect use, must include argument for chat file path location: python3 create_dataset.py file_path')
 # folder_path = sys.argv[1]
 
-folder_path = '/Users/joshua/env/datasets/whatsapp_chat_logs'
+folder_path = 'F:\Dev\datasets\whatsapp'
 
-train_dataloader, test_dataloader = create_dataloaders('joshua', folder_path, batch_size=32)
+train_dataloader, test_dataloader = create_dataloaders('joshua', folder_path, batch_size=16)
 
-model = ChatModel(device='cpu')
-
-# model.load_state_dict(torch.load('model.pt'))
+model = ChatModel(device='cuda:0')
+#model.load_state_dict(torch.load('model.pt'))
  
-train(model=model, train_dataloader=train_dataloader, test_dataloader=test_dataloader, num_epochs=1)
+train(model=model, train_dataloader=train_dataloader, test_dataloader=test_dataloader, num_epochs=5)
 
-prompt = 'Should I buy a car?'
+prompt = 'Gym?'
 answer = model.inference(prompt)
 
 print(answer)
 
-prompt = 'Is the sky blue or green?'
+prompt = 'what are you doing today?'
 answer = model.inference(prompt)
 print(answer)
 

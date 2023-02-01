@@ -9,8 +9,7 @@ def train(
 	num_epochs: int = 10,
 	eval_steps: int = None,
 	optimizer = torch.optim.AdamW,
-	initial_learning_rate: float = 1e-6,
-	device: str = 'cpu',
+	initial_learning_rate: float = 1e-4,
 	):
 
 	'''
@@ -31,9 +30,6 @@ def train(
 
 	# tqdm object to create progress bar for epoch count
 	epoch_bar = tqdm(range(num_epochs), desc='Epoch Progress Bar', position=0)
-
-	# put model on correct device
-	model.to(device)
 
 	# initialise the optimizer with the model parameters we would like to be adjusted during training
 	optimizer = optimizer(
@@ -64,7 +60,7 @@ def train(
 
 		for iteration, batch in enumerate(tqdm(train_dataloader, desc='Batch Progress Bar', position=1, leave=False)):
 			# read each batch and perform a forward pass
-			output = train_forward(model=model, batch=batch.to(device))
+			output = train_forward(model=model, batch=batch)
 			train_loss = output.loss
 
 			# backward pass
@@ -88,6 +84,8 @@ def train(
 						round(eval_loss, 3),
 					)
 				)
+
+				train_loss_list = []
 
 				# if this is the lowest eval loss seen so far then save the model parameters
 				if eval_loss < best_eval_loss:
@@ -114,7 +112,7 @@ def train_forward(model, batch):
 	answer_tokens, _ = model.encode(answer_str)
 
 	# pass through model
-	output = model(prompt_tokens=prompt_tokens, prompt_mask=prompt_mask, labels=answer_tokens)
+	output = model(prompt_tokens=prompt_tokens.to(model.device), prompt_mask=prompt_mask.to(model.device), labels=answer_tokens.to(model.device))
 
 	return output
 
