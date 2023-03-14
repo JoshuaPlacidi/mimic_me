@@ -75,7 +75,7 @@ class ChatModel(torch.nn.Module):
 
 			context_tokens, context_mask = self.encode([context])
 
-			response_tokens = self.model.generate(input_ids=context_tokens.to(self.device), attention_mask=context_mask.to(self.device))
+			response_tokens = self.model.generate(input_ids=context_tokens.to(self.device), attention_mask=context_mask.to(self.device), max_new_tokens=200)
 
 			response = self.tokenizer.batch_decode(response_tokens, skip_special_tokens=True)[0]
 
