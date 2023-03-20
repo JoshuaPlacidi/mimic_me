@@ -1,7 +1,11 @@
 from torch.utils.data import Dataset, DataLoader
 from message_parser import WhatsAppParser
+from typing import List, Union
 
 import random
+import argparse
+import pickle
+import os
 
 class ChatDataset(Dataset):
 	def __init__(self, datapoints: list):
@@ -38,7 +42,7 @@ class ChatDataset(Dataset):
 
 		return context, response
 		
-def create_dataloaders(username: str, data_folder: str, batch_size: int = 32, split_ratio: float = 0.8):
+def create_dataloaders(datapoints, batch_size: int = 32, split_ratio: float = 0.8):
 	'''
 	Description:
 		Parse a series of chat files and create dataset loaders
@@ -52,10 +56,6 @@ def create_dataloaders(username: str, data_folder: str, batch_size: int = 32, sp
 		- train_dataloader: PyTorch dataloader object storing training data
 		- test_dataloader: PyTorch dataloader object storing testing data
 	'''
-	# create parser object and use it to generate datapoints
-	parser = WhatsAppParser(username, debug=False)
-	datapoints = parser.parse_folder(data_folder)
-
 	# shuffle datapoints and split into train/test
 	random.shuffle(datapoints)
 	split_idx = int(len(datapoints) * split_ratio)
@@ -71,3 +71,44 @@ def create_dataloaders(username: str, data_folder: str, batch_size: int = 32, sp
 	test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size)
 
 	return train_dataloader, test_dataloader
+
+if __name__ == '__main__':
+
+	# initialise argument parser
+	parser = argparse.ArgumentParser(description='This file is for generating datasets for the machine learning models')
+
+	# set arguments
+	parser.add_argument('-d','--data_dir', type=str, required=True,
+						help='The path to the directory containing the individual WhatsApp chat files')
+	parser.add_argument('-u', '--username', type=str, required=True,
+						help='The username of the person whom you want to AI to mimic')
+
+	# extract arguments
+	args = parser.parse_args()
+	data_dir = args.data_dir
+	username = args.username
+
+	# check data_directory exists
+	if not os.path.isdir(data_dir):
+		raise Exception('Directory "{0}" does not exist'.format(str(data_dir)))
+
+	# generate datapoints
+	parser = WhatsAppParser(username, debug=False)
+	datapoints = parser.parse_folder(data_dir)
+
+	if len(datapoints) == 0:
+		raise Exception('Could not generate any datapoints. Either "{0}" does not contain chat files, or username "{1}" does not appear in any chat files'.format(str(data_dir), str(username)))
+
+	# save datapoints using pickle
+	with open('datapoints.pkl', 'wb') as file:
+		pickle.dump(datapoints, file)
+
+	print('\nDatapoints saved to "datapoints.pkl"')
+
+
+
+
+	print('\n\n')
+	for d in datapoints:
+		print(d)
+		break

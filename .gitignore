@@ -158,7 +158,11 @@ cython_debug/
 .vs/
 
 # ignore saved model files
+model_states/*
 model.pt
+
+# ignore pickle files
+*.pkl
 
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

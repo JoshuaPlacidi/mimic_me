@@ -38,7 +38,7 @@ class WhatsAppParser():
             "gif omitted",
             "missed video call",
             "\u200e",
-
+            "\u200d",
         ]
 
     def parse_folder(self, folder_path: str):
@@ -84,7 +84,7 @@ class WhatsAppParser():
                 if self.debug:
                     print(' - Failed parsing {0} with exception:\n  {1}'.format(file_name, e))
             
-        print('Found {0} files while parsing folder {1}, successfully generated {2} datapoint'.format(len(valid_files), folder_path, len(folder_datapoints)))
+        print('\nFound {0} files while parsing folder "{1}", successfully generated {2} datapoints with username "{3}"'.format(len(valid_files), folder_path, len(folder_datapoints), self.username))
 
         return folder_datapoints
             
@@ -177,7 +177,7 @@ class WhatsAppParser():
                         # create data point and add it to the list
                         data = {
                             'context': context_string,
-                            'response': response_candidate['message']
+                            'response': '<s> ' + response_candidate['message'] + ' </s>'
                         }
                         datapoints.append(data)
                         
@@ -310,7 +310,7 @@ class WhatsAppParser():
                 # this assertion removes WhatsApp generated messages like "image omitted" or "missed call"
                 # these are not real messages but notifications added to the chat by whatsapp
                 # these messages are proceded by a special character, which we ignore in this assertion check by indexing with [1:]
-                #assert not any(substring in message.lower() for substring in self.messages_to_ignore), 'message "{0}" is in ignore message list'
+                assert not any(substring in message.lower() for substring in self.messages_to_ignore), 'message "{0}" is in ignore message list'
 
             except Exception as message_exception:
                 if print_exceptions:
@@ -327,17 +327,17 @@ class WhatsAppParser():
         return processed_lines
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
 
-    parser = WhatsAppParser(username='joshua', debug=True)
-    datapoints = parser.parse_folder('F:/Dev/datasets/whatsapp')
+#     parser = WhatsAppParser(username='joshua', debug=True)
+#     datapoints = parser.parse_folder('F:/Dev/datasets/whatsapp')
 
 
-    while True:
+#     while True:
 
-        from random import randrange
-        r = randrange(len(datapoints))
-        print(datapoints[r])
-        import time
-        time.sleep(10)
-        print('\n')
+#         from random import randrange
+#         r = randrange(len(datapoints))
+#         print(datapoints[r])
+#         import time
+#         time.sleep(10)
+#         print('\n')

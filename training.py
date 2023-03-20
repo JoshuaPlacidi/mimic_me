@@ -1,6 +1,6 @@
 import torch
 from tqdm import tqdm
-
+import matplotlib.pyplot as plt
 
 def train(
 	model: torch.nn.Module,
@@ -31,9 +31,15 @@ def train(
 	# tqdm object to create progress bar for epoch count
 	epoch_bar = tqdm(range(num_epochs), desc='Epoch Progress Bar', position=0)
 
+	# we only want to train the deocder, so disable gradient calculations for the encode
+	for name, child in model.model.model.named_children():
+		if name == 'encoder':
+			for param in child.parameters():
+				param.requires_grad = False
+
 	# initialise the optimizer with the model parameters we would like to be adjusted during training
 	optimizer = optimizer(
-		params=model.parameters(),
+		params=filter(lambda p: p.requires_grad, model.parameters()),
 		lr=initial_learning_rate,
 	)
 	
@@ -50,15 +56,22 @@ def train(
 		eval_steps = len(train_dataloader) // 4
 		eval_steps = max(1, eval_steps)
 
-	# list for storing training losses
+	# lists for storing training stats
 	train_loss_list = []
+	
+	epochs = []
+	all_train_loss = []
+	all_eval_loss = []
+	all_lr = []
 
 	# used to store the best evaluation performance seen so far, initialised to large dummy value
 	best_eval_loss = 1e10
+	eval_loss = 0
 
 	for epoch in epoch_bar:
 
 		for iteration, batch in enumerate(tqdm(train_dataloader, desc='Batch Progress Bar', position=1, leave=False)):
+			
 			# read each batch and perform a forward pass
 			output = train_forward(model=model, batch=batch)
 			train_loss = output.loss
@@ -90,7 +103,19 @@ def train(
 				# if this is the lowest eval loss seen so far then save the model parameters
 				if eval_loss < best_eval_loss:
 					best_eval_loss = eval_loss
-					torch.save(model.state_dict(), 'model.pt')
+					torch.save(model.state_dict(), 'model_states/epoch_{0}_{1}.pt'.format(epoch, iteration))
+
+				epochs.append(epoch)
+				all_train_loss.append(train_loss.item())
+				all_eval_loss.append(eval_loss)
+				all_lr.append(scheduler.optimizer.param_groups[0]['lr'])
+
+	plot({
+		'epoch': epochs,
+		'train loss': all_train_loss,
+		'valid loss': all_eval_loss,
+		'learning rate': all_lr
+	})
 			
 
 
@@ -140,5 +165,22 @@ def evaluate(model, dataloader):
 		# calculalate mean
 		eval_loss /= len(dataloader)
 
+		#print(model.inference('Tell me about yourself and what you like to do most in this world?'))
+
 	return eval_loss
 
+
+def plot(data: dict):
+	num_plots = len(data)
+
+	for index, (title, values) in enumerate(data.items()):
+		plt.subplot(1, num_plots, index + 1)
+		plt.plot(range(len(values)), values)
+		plt.title(title)
+
+		if title == 'learning rate':
+			plt.yscale("log")
+
+	plt.tight_layout()
+	plt.savefig('training_plots.png')
+	plt.show()

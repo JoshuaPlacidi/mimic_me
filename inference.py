@@ -5,7 +5,7 @@ from transformers import BlenderbotTokenizer
 
 model = ChatModel(device='cuda:0')
 
-model.load_state_dict(torch.load('model.pt'))
+model.load_state_dict(torch.load('model_states/epoch_0_125.pt'))
 
 model_name = "facebook/blenderbot-400M-distill"
 
