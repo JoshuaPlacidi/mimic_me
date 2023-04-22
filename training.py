@@ -1,6 +1,8 @@
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import datetime
+import os
 
 def train(
 	model: torch.nn.Module,
@@ -9,7 +11,10 @@ def train(
 	num_epochs: int = 10,
 	eval_steps: int = None,
 	optimizer = torch.optim.AdamW,
-	initial_learning_rate: float = 1e-4,
+	initial_learning_rate: float = 1e-5,
+	train_layers: int = 3,
+	log_filepath: str = 'training.log',
+	log_test_prompt: str = "Hello, tell me about yourself"
 	):
 
 	'''
@@ -27,15 +32,33 @@ def train(
 		- initial_learning_rate: The initial size of parameter adjustments, lr gets reduced during training by a scheduler
 		- device: which hardware component (device) to run model training on, typically "cpu" or "cuda"
 	'''
+	# the total number of layers in the model
+	NUM_LAYERS = 11
+
+	# create training folder
+	folder_name = datetime.datetime.now().strftime('%d_%m_%Y__%H_%M')
+	folder_path = os.path.join('training_outputs', folder_name)
+	os.mkdir(folder_path)
 
 	# tqdm object to create progress bar for epoch count
 	epoch_bar = tqdm(range(num_epochs), desc='Epoch Progress Bar', position=0)
 
 	# we only want to train the deocder, so disable gradient calculations for the encode
 	for name, child in model.model.model.named_children():
-		if name == 'encoder':
-			for param in child.parameters():
-				param.requires_grad = False
+		for name, param in child.named_parameters():
+
+			if name.startswith('layers.'):
+
+				layer_num_start_index = len('layers.')
+				layer_num_end_index = layer_num_start_index + name[layer_num_start_index:].find('.')
+
+				layer_num = int(name[layer_num_start_index:layer_num_end_index])
+
+				# this will be true for layers which we do not wish to train, we only train the last train_layers number of layers
+				if layer_num <= (NUM_LAYERS - train_layers):
+					param.requires_grad = False
+				else:
+					continue
 
 	# initialise the optimizer with the model parameters we would like to be adjusted during training
 	optimizer = optimizer(
@@ -48,7 +71,9 @@ def train(
 		optimizer = optimizer,
 		mode = 'min',
 		factor = 0.1,
+		patience = 2,
 		threshold = 0.005,
+		cooldown = 1,
 	)
 
 	# if eval_steps has not be specified than set evaluation to run 4 times per epoch
@@ -79,7 +104,6 @@ def train(
 			# backward pass
 			train_loss.backward()
 			optimizer.step()
-			scheduler.step(train_loss)
 
 			# store the training loss
 			train_loss_list.append(train_loss.item())
@@ -88,36 +112,58 @@ def train(
 				# if eval_steps has been reached then perform an evaluation
 				eval_loss = evaluate(model, test_dataloader)
 
+				# calculate the train and validation loss for outputing/logging
+				log_train_loss = round(sum(train_loss_list) / len(train_loss_list), 3)
+				log_val_loss = round(eval_loss, 3)
+
+				# get the current learning rate
+				current_lr = scheduler.optimizer.param_groups[0]['lr']
+
 				# update the progress bar
 				epoch_bar.set_description(
-					'Epoch Progress Bar: Iter {0}/{1} | Train Loss {2} | Eval Loss {3}'.format(
-						iteration,
-						len(train_dataloader),
-						round(sum(train_loss_list) / len(train_loss_list), 3),
-						round(eval_loss, 3),
+					'Epoch Progress Bar: lr {0} | Train Loss {1} | Eval Loss {2}'.format(
+						current_lr,
+						log_train_loss,
+						log_val_loss,
 					)
 				)
 
 				train_loss_list = []
+				model_saved = False
+
+				# attempt to generate test prompt response
+				try:
+					model_output = model.inference(log_test_prompt)
+				except:
+					model_output = "FAILED"
 
 				# if this is the lowest eval loss seen so far then save the model parameters
 				if eval_loss < best_eval_loss:
 					best_eval_loss = eval_loss
-					torch.save(model.state_dict(), 'model_states/epoch_{0}_{1}.pt'.format(epoch, iteration))
 
-				epochs.append(epoch)
-				all_train_loss.append(train_loss.item())
-				all_eval_loss.append(eval_loss)
-				all_lr.append(scheduler.optimizer.param_groups[0]['lr'])
+					if model_output != "FAILED":
+						# attempt to save model
+						try:
+							torch.save(model.state_dict(), os.path.join(folder_path, 'model.pt'))
+							model_saved = True
+						except:
+							pass
 
-	plot({
-		'epoch': epochs,
-		'train loss': all_train_loss,
-		'valid loss': all_eval_loss,
-		'learning rate': all_lr
-	})
-			
-
+				# store sample outputs in a text file to see model development over time
+				with open(os.path.join(folder_path, log_filepath), "a+") as log_file:
+						log_file.write(",".join([
+								str(epoch),
+								str(iteration),
+								str(log_train_loss),
+								str(log_val_loss),
+								str(current_lr),
+								str(model_saved),
+								'"' + model_output + '"',
+							])
+							+ "\n" # add new line character to the end of the string
+						)
+						
+		scheduler.step(train_loss)
 
 def train_forward(model, batch):
 	'''
@@ -164,8 +210,6 @@ def evaluate(model, dataloader):
 
 		# calculalate mean
 		eval_loss /= len(dataloader)
-
-		#print(model.inference('Tell me about yourself and what you like to do most in this world?'))
 
 	return eval_loss
 

@@ -104,11 +104,3 @@ if __name__ == '__main__':
 		pickle.dump(datapoints, file)
 
 	print('\nDatapoints saved to "datapoints.pkl"')
-
-
-
-
-	print('\n\n')
-	for d in datapoints:
-		print(d)
-		break

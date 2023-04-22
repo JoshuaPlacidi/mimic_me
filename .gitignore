@@ -158,8 +158,7 @@ cython_debug/
 .vs/
 
 # ignore saved model files
-model_states/*
-model.pt
+training_outputs/*
 
 # ignore pickle files
 *.pkl

@@ -38,6 +38,6 @@ if __name__ == '__main__':
 
     model = ChatModel(device=device)
 
-    train(model=model, train_dataloader=train_dataloader, test_dataloader=test_dataloader, num_epochs=40)
+    train(model=model, train_dataloader=train_dataloader, test_dataloader=test_dataloader, num_epochs=40, train_layers=2, initial_learning_rate=1e-5)
 
     print('\nTraining complete, model state saved to model.pt')
