@@ -1,6 +1,5 @@
 import torch
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 import datetime
 import os
 
@@ -212,19 +211,3 @@ def evaluate(model, dataloader):
 		eval_loss /= len(dataloader)
 
 	return eval_loss
-
-
-def plot(data: dict):
-	num_plots = len(data)
-
-	for index, (title, values) in enumerate(data.items()):
-		plt.subplot(1, num_plots, index + 1)
-		plt.plot(range(len(values)), values)
-		plt.title(title)
-
-		if title == 'learning rate':
-			plt.yscale("log")
-
-	plt.tight_layout()
-	plt.savefig('training_plots.png')
-	plt.show()
