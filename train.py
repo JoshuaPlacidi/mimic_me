@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
     assert num_epochs >= 1, "The number epochs must be >= 1"
 
-    assert train_layer >= 1, "The number of training layers must be >= 1"
+    assert train_layers >= 1, "The number of training layers must be >= 1"
 
     # format the training device, uses cuda is specified otherwise trains using cpu
     device = "cuda:{0}".format(cuda_id) if cuda_id != None else 'cpu'
