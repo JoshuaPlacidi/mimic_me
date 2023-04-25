@@ -176,8 +176,8 @@ class WhatsAppParser():
 
                         # create data point and add it to the list
                         data = {
-                            'context': context_string,
-                            'response': '<s> ' + response_candidate['message'] + ' </s>'
+                            'context': context_string[4:-6], # remove the first <s> and last </s> from the string
+                            'response': '<s> ' + response_candidate['message'] + '</s>'
                         }
                         datapoints.append(data)
                         

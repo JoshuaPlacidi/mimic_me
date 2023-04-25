@@ -34,6 +34,7 @@ class ChatModel(torch.nn.Module):
 
 		output = self.tokenizer.batch_encode_plus(
 			batch_text_or_text_pairs = text,
+			add_prefix_space = False,
 			return_tensors='pt',
 			padding='max_length',
 			max_length=100,
@@ -76,7 +77,7 @@ class ChatModel(torch.nn.Module):
 			context_tokens, context_mask = self.encode([context])
 
 			response_tokens = self.model.generate(input_ids=context_tokens.to(self.device), attention_mask=context_mask.to(self.device), max_new_tokens=200)
-
+			
 			response = self.tokenizer.batch_decode(response_tokens, skip_special_tokens=True)[0]
 
 			return response

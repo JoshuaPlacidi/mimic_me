@@ -131,22 +131,14 @@ def train(
 				model_saved = False
 
 				# attempt to generate test prompt response
-				try:
-					model_output = model.inference(log_test_prompt)
-				except:
-					model_output = "FAILED"
+				model_output = model.inference(log_test_prompt)
 
 				# if this is the lowest eval loss seen so far then save the model parameters
 				if eval_loss < best_eval_loss:
 					best_eval_loss = eval_loss
 
-					if model_output != "FAILED":
-						# attempt to save model
-						try:
-							torch.save(model.state_dict(), os.path.join(folder_path, 'model.pt'))
-							model_saved = True
-						except:
-							pass
+					torch.save(model.state_dict(), os.path.join(folder_path, 'model.pt'))
+					model_saved = True
 
 				# store sample outputs in a text file to see model development over time
 				with open(os.path.join(folder_path, log_filepath), "a+") as log_file:
