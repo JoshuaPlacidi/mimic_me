@@ -72,7 +72,7 @@ def train(
 		factor = 0.1,
 		patience = 2,
 		threshold = 0.005,
-		cooldown = 1,
+		cooldown = 10,
 	)
 
 	# if eval_steps has not be specified than set evaluation to run 4 times per epoch
@@ -134,7 +134,7 @@ def train(
 				model_output = model.inference(log_test_prompt)
 
 				# if this is the lowest eval loss seen so far then save the model parameters
-				if eval_loss < best_eval_loss:
+				if eval_loss <= best_eval_loss:
 					best_eval_loss = eval_loss
 
 					torch.save(model.state_dict(), os.path.join(folder_path, 'model.pt'))
@@ -153,7 +153,13 @@ def train(
 							])
 							+ "\n" # add new line character to the end of the string
 						)
-						
+
+				# if our learning rate drops below 1e-9 then end training, as not learning
+				# will happend with a learning rate this small
+				if current_lr < 1e-9:
+					return
+
+		# update the scheduler using the latest training loss value			
 		scheduler.step(train_loss)
 
 def train_forward(model, batch):
@@ -200,6 +206,6 @@ def evaluate(model, dataloader):
 			eval_loss += train_forward(model, batch).loss.item()
 
 		# calculalate mean
-		eval_loss /= len(dataloader)
+		eval_loss /= max(len(dataloader),1)
 
 	return eval_loss
