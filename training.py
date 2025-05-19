@@ -42,7 +42,7 @@ def train(
 	# tqdm object to create progress bar for epoch count
 	epoch_bar = tqdm(range(num_epochs), desc='Epoch Progress Bar', position=0)
 
-	# we only want to train the deocder, so disable gradient calculations for the encode
+        # we only want to train the decoder, so disable gradient calculations for the encode
 	for name, child in model.model.model.named_children():
 		for name, param in child.named_parameters():
 
